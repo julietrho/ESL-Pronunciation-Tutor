@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESL Pronunciation Tutor</title>
+<style>
+body { 
+  font-family: Arial, sans-serif; 
+  text-align: center; 
+  padding: 20px; 
+  background: url('https://upload.wikimedia.org/wikipedia/commons/c/cf/Toronto_skyline_2018.jpg') no-repeat center center fixed; 
+  background-size: cover; 
+  color: #333; 
+}
+.overlay {
+  background: rgba(255,255,255,0.95); 
+  padding: 30px; 
+  border-radius: 25px; 
+  display: inline-block; 
+  max-width: 800px;
+  width: 95%;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+}
+h1 { 
+  background: #ffeb3b; 
+  display: inline-block; 
+  padding: 20px 35px; 
+  border-radius: 20px; 
+  margin-bottom: 35px; 
+  box-shadow: 0 6px 15px rgba(0,0,0,0.25); 
+  color: #333;
+  font-size: 1.8rem;
+}
+.controls {
+  margin: 25px 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 15px;
+}
+input, button, label, select { 
+  padding: 14px 18px; 
+  font-size: 16px; 
+  margin: 6px; 
+  border-radius: 12px; 
+  border: none; 
+  box-shadow: 0 3px 7px rgba(0,0,0,0.12); 
+  transition: 0.2s; 
+}
+input[type="text"] { min-width: 250px; flex: 1; }
+button { background: #4caf50; color: white; font-weight: bold; flex: none; }
+button:hover { background-color: #388e3c; cursor: pointer; }
+.word-container { display: inline-block; margin: 12px; text-align: center; }
+.syllable { display: inline-block; margin: 6px; padding: 10px 16px; border-radius: 14px; background: #03a9f4; font-size: 20px; color: white; font-weight: bold; transition: transform 0.3s, background 0.3s; }
+.highlight { background: #ff9800 !important; transform: scale(1.35); }
+.correct { background: #4caf50 !important; }
+#score { margin-top: 25px; font-size: 22px; color: #1976d2; font-weight: bold; }
+/* Mobile responsiveness */
+@media (max-width: 600px) {
+  .overlay { padding: 20px; }
+  h1 { font-size: 1.4rem; padding: 15px 20px; }
+  .controls { flex-direction: column; align-items: stretch; }
+  input, select, button, label { width: 100%; max-width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="overlay">
+<h1>🎓 ESL Pronunciation Tutor</h1>
+
+<div class="controls">
+<input id="sentence" type="text" placeholder="Type a sentence">
+<label>Repetitions: <input id="repeatCount" type="number" value="1" min="1" max="5"></label>
+<label>Speed:
+<select id="speedMode">
+  <option value="0.7">Slow</option>
+  <option value="1" selected>Normal</option>
+  <option value="1.3">Fast</option>
+</select>
+</label>
+</div>
+
+<div class="controls">
+<button onclick="speakFullSentence()">🔊 Hear Full Sentence</button>
+<button onclick="speakWordByWord()">📝 Step-by-Step Word</button>
+<button id="recordBtn">🎙️ Start Recording</button>
+<button id="playBackBtn">▶️ Play Back</button>
+<button id="checkBtn">✅ Check Pronunciation</button>
+</div>
+
+<audio id="recordedAudio" controls></audio>
+<div id="display"></div>
+<div id="score"></div>
+
+<!-- Embedded chime audio as Base64 -->
+<audio id="chimeSound" src="data:audio/mp3;base64,//uQxAAAAAAAAAAAAAAAAAAAA..."></audio>
+
+</div>
+
+<script>
+let synth = window.speechSynthesis;
+let mediaRecorder, recordedChunks = [];
+
+function getUSVoice(){
+  const voices = speechSynthesis.getVoices();
+  return voices.find(v => v.name==="Google US English") || voices.find(v => v.lang==="en-US") || voices[0];
+}
+
+function displayWords(words){
+  const display = document.getElementById("display");
+  display.innerHTML = '';
+  words.forEach((w,i)=>{
+    const container = document.createElement('div');
+    container.className = 'word-container';
+    container.id = `w${i}`;
+    const span = document.createElement('span');
+    span.className = 'syllable';
+    span.id = `w${i}s0`;
+    span.textContent = w;
+    container.appendChild(span);
+    display.appendChild(container);
+  });
+}
+
+function speakFullSentence() {
+  const text = document.getElementById("sentence").value.trim();
+  if (!text) return alert("Type something!");
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.voice = getUSVoice();
+  utter.rate = parseFloat(document.getElementById("speedMode").value);
+  synth.speak(utter);
+}
+
+function speakWordByWord(){
+  const text = document.getElementById("sentence").value.trim();
+  if(!text) return alert("Type something!");
+  const words = text.split(" ");
+  displayWords(words);
+  const repeat = parseInt(document.getElementById("repeatCount").value) || 1;
+  const speed = parseFloat(document.getElementById("speedMode").value);
+  const chime = document.getElementById("chimeSound");
+
+  let delay = 0;
+  words.forEach((word,i)=>{
+    for(let r=0;r<repeat;r++){
+      setTimeout(()=>{
+        words.forEach((_,k)=>{
+          const el = document.getElementById(`w${k}s0`);
+          el.classList.remove("highlight","correct");
+          el.style.transform = "scale(1)";
+        });
+        const current = document.getElementById(`w${i}s0`);
+        current.classList.add("highlight","correct");
+
+        let utter = new SpeechSynthesisUtterance(word);
+        utter.voice = getUSVoice();
+        utter.rate = speed;
+        chime.currentTime = 0;
+        chime.play();
+        synth.speak(utter);
+      }, delay);
+      delay += 700;
+    }
+  });
+}
+
+// Record
+const recordBtn = document.getElementById('recordBtn');
+const recordedAudio = document.getElementById('recordedAudio');
+recordBtn.addEventListener('click', async ()=>{
+  if(recordBtn.dataset.recording==="true"){
+    mediaRecorder.stop();
+    recordBtn.textContent = "🎙️ Start Recording";
+    recordBtn.dataset.recording = "false";
+  } else {
+    recordedChunks = [];
+    const stream = await navigator.mediaDevices.getUserMedia({ audio:true });
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = e => { if(e.data.size>0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = ()=>{ recordedAudio.src = URL.createObjectURL(new Blob(recordedChunks)); };
+    mediaRecorder.start();
+    recordBtn.textContent = "⏹️ Stop Recording";
+    recordBtn.dataset.recording="true";
+  }
+});
+
+// Playback
+document.getElementById('playBackBtn').addEventListener('click', ()=>{
+  if(!recordedAudio.src) return alert("Record your pronunciation first!");
+  recordedAudio.play();
+});
+
+// Pronunciation check
+document.getElementById('checkBtn').addEventListener('click', ()=>{
+  const sentence = document.getElementById('sentence').value.trim();
+  if(!sentence) return alert("Type a sentence first!");
+  if(!recordedAudio.src) return alert("Record your pronunciation first!");
+  const audio = new Audio(recordedAudio.src);
+  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  recognition.lang = 'en-US';
+  recognition.interimResults = false;
+  recognition.onresult = (event)=>{
+    const transcript = event.results[0][0].transcript;
+    const wordsCorrect = sentence.split(" ").filter((w,i)=> transcript.split(" ")[i] && transcript.split(" ")[i].toLowerCase()===w.toLowerCase()).length;
+    const percentage = Math.round((wordsCorrect / sentence.split(" ").length) * 100);
+    document.getElementById('score').innerHTML = `Your pronunciation similarity: <b>${percentage}%</b>`;
+  };
+  recognition.onerror = (event)=>{ alert("Speech recognition failed: " + event.error); };
+  audio.play();
+  recognition.start();
+});
+
+// Initialize voices
+window.onload = () => { if(speechSynthesis.getVoices().length===0) synth.onvoiceschanged=()=>{}; };
+</script>
+</body>
+</html>
